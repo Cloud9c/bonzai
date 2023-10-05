@@ -8,14 +8,14 @@ import { COLORS } from "./constants";
 import { useRef, FormEvent, useState, forwardRef, useEffect } from "react";
 import { Nav } from "../components/nav";
 import { useWindowSize } from "@react-hook/window-size";
-import Metaphor, { GetContentsResponse, SearchResponse } from "metaphor-node";
 import dynamic from "next/dynamic";
+import { SearchResponse } from "metaphor-node";
+import { searchMetaphor } from "./services/search";
+import { findSimilar } from "./services/findSimilar";
 
 const NoSSRForceGraph = dynamic(() => import("./ForceGraph2D"), {
   ssr: false,
 });
-
-const metaphor = new Metaphor("edaa6ba7-a7bc-43da-a12e-66e00af6e062" as string);
 
 export default function Home() {
   const [data, setData] = useState({
@@ -41,11 +41,6 @@ export default function Home() {
   async function focus(node: NodeObject | undefined = undefined) {
     if (node !== undefined) {
       setFocused(node);
-
-      const response: GetContentsResponse = await metaphor.getContents([
-        node.documentId,
-      ]);
-      node.summary = response.contents[0].extract;
     } else {
       setFocused(undefined);
     }
@@ -61,6 +56,7 @@ export default function Home() {
           "searchbar"
         ) as HTMLInputElement;
         query = searchbar.value as string;
+        if (query === "") return;
       }
       await search(query);
     }
@@ -72,13 +68,8 @@ export default function Home() {
     setLoading(true);
 
     const response: SearchResponse = focused
-      ? await metaphor.findSimilar(focused.url, {
-          numResults,
-        })
-      : await metaphor.search(query, {
-          numResults,
-          useAutoprompt: true,
-        });
+      ? await findSimilar(focused.url, numResults)
+      : await searchMetaphor(query, numResults);
 
     setLoading(false);
 
