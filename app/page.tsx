@@ -1,113 +1,186 @@
-import Image from 'next/image'
+"use client";
+import ForceGraph2D, {
+  ForceGraphMethods,
+  LinkObject,
+  NodeObject,
+} from "react-force-graph-2d";
+import { COLORS } from "./constants";
+import { useRef, FormEvent, useState } from "react";
+import { Nav } from "../components/nav";
+import { useWindowSize } from "@react-hook/window-size";
+import Metaphor, { GetContentsResponse, SearchResponse } from "metaphor-node";
+
+const metaphor = new Metaphor("edaa6ba7-a7bc-43da-a12e-66e00af6e062" as string);
 
 export default function Home() {
+  const fgRef = useRef<ForceGraphMethods>();
+  const [data, setData] = useState({
+    nodes: [] as any,
+    links: [] as any,
+  });
+  const [focused, setFocused] = useState<NodeObject | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+  const [width, height] = useWindowSize();
+
+  async function focus(node: NodeObject | undefined = undefined) {
+    if (node !== undefined) {
+      setFocused(node);
+      fgRef.current?.centerAt(node.x, node.y, 1000);
+
+      const response: GetContentsResponse = await metaphor.getContents([
+        node.documentId,
+      ]);
+      node.summary = response.contents[0].extract;
+    } else {
+      setFocused(undefined);
+    }
+  }
+
+  async function onSearchSubmit(event: FormEvent) {
+    event.preventDefault();
+
+    if (!loading) {
+      let query = "";
+      if (!focused) {
+        const searchbar = document.getElementById(
+          "searchbar"
+        ) as HTMLInputElement;
+        query = searchbar.value as string;
+      }
+      await search(query);
+    }
+  }
+
+  async function search(query: string) {
+    const numResults = 3;
+
+    setLoading(true);
+
+    const response: SearchResponse = focused
+      ? await metaphor.findSimilar(focused.url, {
+          numResults,
+        })
+      : await metaphor.search(query, {
+          numResults,
+          useAutoprompt: true,
+        });
+
+    setLoading(false);
+
+    response.results.forEach((result) => {
+      setData(({ nodes, links }) => {
+        const id = crypto.randomUUID();
+        const data = {
+          nodes: [
+            ...nodes,
+            {
+              id,
+              title: result.title,
+              url: result.url,
+              documentId: result.id,
+              domain: new URL(result.url).hostname,
+              publishedDate: result.publishedDate,
+              author: result.author,
+            },
+          ],
+          links: focused ? [...links, { source: id, target: focused.id }] : [],
+        };
+        return data;
+      });
+    });
+  }
+
+  document.addEventListener("keydown", function (event: KeyboardEvent) {
+    // Checking for Backspace.
+    if (event.key === "Backspace" || event.key === "Delete") {
+      if (focused) {
+        prune(focused);
+      }
+    }
+  });
+
+  function onNodeClick(node: NodeObject, event: MouseEvent) {
+    if (fgRef.current) {
+      if (event.shiftKey) {
+        window.open(node.url);
+      } else {
+        focus(node);
+      }
+    }
+  }
+
+  function prune(node: NodeObject) {
+    if (focused?.id === node.id) focus();
+
+    setData(({ nodes, links }) => {
+      const newNodes = nodes.filter((n: NodeObject) => n.id !== node.id);
+      const newLinks = links.filter((l: LinkObject) => {
+        const source = l.source as LinkObject;
+        const target = l.target as LinkObject;
+        return source.id !== node.id && target.id !== node.id;
+      });
+      return {
+        nodes: newNodes,
+        links: newLinks,
+      };
+    });
+  }
+
+  function nodeCanvasObject(
+    node: NodeObject,
+    ctx: CanvasRenderingContext2D,
+    globalScale: number
+  ) {
+    // // Draw circle
+    ctx.beginPath();
+    ctx.arc(
+      node.x as number,
+      node.y as number,
+      10 / globalScale,
+      0,
+      2 * Math.PI,
+      false
+    );
+    ctx.fillStyle = focused?.id === node.id ? COLORS.green : COLORS.black;
+    ctx.fill();
+
+    // Draw text title
+    const title = node.title as string;
+    const fontSize = 12 / globalScale;
+    const padding = 20;
+    ctx.font = `${fontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = COLORS.black;
+    ctx.fillText(
+      title,
+      node.x as number,
+      (node.y as number) + padding / globalScale
+    );
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
+    <main className="min-h-screen black">
+      <Nav
+        onSearchSubmit={onSearchSubmit}
+        focused={focused}
+        loading={loading}
+      />
+      <ForceGraph2D
+        graphData={data}
+        width={width}
+        height={height}
+        ref={fgRef}
+        nodeLabel="url"
+        nodeColor={COLORS.white}
+        backgroundColor={COLORS.white}
+        minZoom={1}
+        onNodeClick={onNodeClick}
+        enablePointerInteraction={true}
+        onBackgroundClick={() => focus()}
+        nodeCanvasObject={nodeCanvasObject}
+        onLinkClick={prune}
+      />
     </main>
-  )
+  );
 }

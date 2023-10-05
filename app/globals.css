@@ -2,26 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
+    --green: 86, 35%, 51%;
+    --blue: 161, 32%, 61%;
+    --gray: 0, 0%, 50%;
+    --brown: 25, 9%, 55%;
+    --black: 222.2 47.4% 11.2%;
+    --beige: 51, 29%, 91%;
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+    --background: 0 0% 100%;
+    --foreground: var(--black);
+
+    --card: 0 0% 100%;
+    --card-foreground: var(--black);
+
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--black);
+
+    --primary: var(--black);
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: var(--black);
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: var(--black);
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: var(--black);
+
+    --radius: 0.5rem;
+  }
 }
