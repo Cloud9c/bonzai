@@ -1,31 +1,46 @@
 "use client";
-import ForceGraph2D, {
+import ReactForceGraph2d, {
   ForceGraphMethods,
   LinkObject,
   NodeObject,
 } from "react-force-graph-2d";
 import { COLORS } from "./constants";
-import { useRef, FormEvent, useState } from "react";
+import { useRef, FormEvent, useState, forwardRef, useEffect } from "react";
 import { Nav } from "../components/nav";
 import { useWindowSize } from "@react-hook/window-size";
 import Metaphor, { GetContentsResponse, SearchResponse } from "metaphor-node";
+import dynamic from "next/dynamic";
+
+const NoSSRForceGraph = dynamic(() => import("./ForceGraph2D"), {
+  ssr: false,
+});
 
 const metaphor = new Metaphor("edaa6ba7-a7bc-43da-a12e-66e00af6e062" as string);
 
 export default function Home() {
-  const fgRef = useRef<ForceGraphMethods>();
   const [data, setData] = useState({
     nodes: [] as any,
     links: [] as any,
   });
   const [focused, setFocused] = useState<NodeObject | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+
   const [width, height] = useWindowSize();
+
+  useEffect(() => {
+    document.addEventListener("keydown", function (event: KeyboardEvent) {
+      // Checking for Backspace.
+      if (event.key === "Backspace" || event.key === "Delete") {
+        if (focused) {
+          prune(focused);
+        }
+      }
+    });
+  });
 
   async function focus(node: NodeObject | undefined = undefined) {
     if (node !== undefined) {
       setFocused(node);
-      fgRef.current?.centerAt(node.x, node.y, 1000);
 
       const response: GetContentsResponse = await metaphor.getContents([
         node.documentId,
@@ -70,7 +85,7 @@ export default function Home() {
     response.results.forEach((result) => {
       setData(({ nodes, links }) => {
         const id = crypto.randomUUID();
-        const data = {
+        const data: any = {
           nodes: [
             ...nodes,
             {
@@ -90,22 +105,11 @@ export default function Home() {
     });
   }
 
-  document.addEventListener("keydown", function (event: KeyboardEvent) {
-    // Checking for Backspace.
-    if (event.key === "Backspace" || event.key === "Delete") {
-      if (focused) {
-        prune(focused);
-      }
-    }
-  });
-
   function onNodeClick(node: NodeObject, event: MouseEvent) {
-    if (fgRef.current) {
-      if (event.shiftKey) {
-        window.open(node.url);
-      } else {
-        focus(node);
-      }
+    if (event.shiftKey) {
+      window.open(node.url);
+    } else {
+      focus(node);
     }
   }
 
@@ -166,11 +170,10 @@ export default function Home() {
         focused={focused}
         loading={loading}
       />
-      <ForceGraph2D
+      <NoSSRForceGraph
         graphData={data}
         width={width}
         height={height}
-        ref={fgRef}
         nodeLabel="url"
         nodeColor={COLORS.white}
         backgroundColor={COLORS.white}
